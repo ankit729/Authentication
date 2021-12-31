@@ -1,8 +1,9 @@
 require("dotenv").config();
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const express = require("express");
-const md5 = require("md5");
 const mongoose = require("mongoose");
 
 const app = express();
@@ -37,14 +38,25 @@ app.route("/login")
     
     .post(function(req, res) {
         const email = req.body.email;
-        const password = md5(req.body.password);
+        const password = req.body.password;
 
-        User.findOne({email: email, password: password}, function(err, foundUser) {
+        User.findOne({email: email}, function(err, foundUser) {
             if(err){
                 console.log(err);
             }
             else if(foundUser){
-                res.render("secrets");
+                const hash = foundUser.password;
+                bcrypt.compare(password, hash, function(err, result) {
+                    if(err){
+                        console.log(err);
+                    }
+                    else if(result === true){
+                        res.render("secrets");
+                    }
+                    else{
+                        res.render("login");
+                    }
+                });
             }
             else{
                 res.render("login");
@@ -59,18 +71,25 @@ app.route("/register")
 
     .post(function(req, res) {
         const email = req.body.email;
-        const password = md5(req.body.password);
-
-        const user = new User({
-            email: email,
-            password: password
-        });
-        user.save(function(err) {
+        const password = req.body.password;
+        
+        bcrypt.hash(password, saltRounds, function(err, hash) {
             if(err){
                 console.log(err);
             }
             else{
-                res.render("secrets");
+                const user = new User({
+                    email: email,
+                    password: hash
+                });
+                user.save(function(err) {
+                    if(err){
+                        console.log(err);
+                    }
+                    else{
+                        res.redirect("/login");
+                    }
+                });
             }
         });
     });
